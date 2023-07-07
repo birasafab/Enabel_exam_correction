@@ -1,0 +1,79 @@
+---
+title: "Enabel_exam_code"
+author: "Birasafab"
+date: "2023-07-07"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Loading the required packages
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+library(purrr)
+library(readr)
+```
+
+# Reading the data
+```{r}
+# HIV data set for 2005
+hiv_2005 = read_csv('HIV_2005.csv',col_types = cols(.default = 'c'))
+
+# HIV data set for 2010
+hiv_2010 = read_csv('HIV_2010.csv',col_types = cols(.default = 'c'))
+
+# HIV data set for 2015
+hiv_2015 = read_csv('HIV_2015.csv',col_types = cols(.default = 'c'))
+
+# merging the above three datasets
+final_hiv  = bind_rows(list(hiv_2005,hiv_2010,hiv_2015),.id = 'id') %>% mutate(id = ifelse(id==1,2005,ifelse(id==2,2010,ifelse(id==3,2015,id))))
+
+# child dataset 2005
+ch_2005 = read_csv("Ch_2005.csv",col_types = cols(.default = 'c'))
+
+#child dataset 2010
+ch_2010 = read_csv("Ch_2010.csv",col_types = cols(.default = 'c'))
+
+#child dataset 2015
+ch_2015 = read_csv("Ch_2015.csv",col_types = cols(.default = 'c'))
+
+final_chd = bind_rows(list(ch_2005,ch_2010,ch_2015), .id = 'year') %>% 
+  mutate(year = ifelse(year==1,2005,ifelse(year==2,2010,ifelse(year==3,2015,year))))
+```
+
+# Merging the two data sets
+```{r}
+final_data = final_chd %>% 
+  left_join(final_hiv, by =  c(year='id',v001='v001',v002='v002',v003='v003')) %>% 
+  mutate(hiv03 = ifelse(hiv03=='hiv1  positive','hiv  positive',hiv03))
+```
+
+# Creating child age column
+```{r}
+# creating new column regarding the month of birth for a child and the month of interview
+final_data = final_data %>% mutate(birth_date = mdy(paste(b1,1,b2,sep = '/')),interview_month = mdy(paste(v006,1,v007,sep = '/'))) %>% 
+
+# creating interval between two dates, for me to be able to compute the difference in give time objects (month, days, etc.)
+  mutate(interval =interval(birth_date,interview_month),
+# finding the difference in months
+         months = interval %/% months(1),
+# finding the difference in days
+         days = interview_month-birth_date,
+         days_new = interval %/% days(1))
+
+
+```
+
+# plotting child health status
+```{r}
+final_data %>% filter(!is.na(hiv03)) %>% ggplot() +geom_bar(aes(x = b5, fill = hiv03))+
+  theme_light()+
+  labs(title = 'Child health Status',
+       fill = 'Mother HIV status')+
+  facet_wrap(~year)
+
+```
+
